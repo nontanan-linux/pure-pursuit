@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import math
 import matplotlib.animation as animation
 import WaypointGenerator as wg
+import time
 # from IPython import display
 ########################################################################################################
 
@@ -20,13 +21,14 @@ import WaypointGenerator as wg
 ####									Helper function												####
 ########################################################################################################
 # Vehicle parameters (m)
-LENGTH = 4.5 #vehicle lenght
+LENGTH = 3.0 #vehicle lenght
 WIDTH = 2.0 #vehicle width
-BACKTOWHEEL = 1.0 #center back vehicle to back of car
+BACKTOWHEEL = 0.5 #center back vehicle to back of car
 WHEEL_LEN = 0.3
 WHEEL_WIDTH = 0.2
 TREAD = 0.7
-WB = 2.5
+WB = 2.0
+
 def plotVehicle(x, y, yaw, steer=0.0, cabcolor="-r", truckcolor="-k"):
 	"""
 	The function is to plot the vehicle
@@ -310,7 +312,8 @@ yaw = currentHeading*2*pi/360
 lastFoundIndex = 0
 lookAheadDis = 5
 linearVel = 2
-dt = 50
+dt = 0.5
+prev_time = 0
 
 
 # set this to true if you use rotations
@@ -331,14 +334,8 @@ def main():
 	global lastFoundIndex
 	global linearVel
 	global yaw
-	# create vehicle
-	# plotVehicle(ego.x, ego.y, ego.yaw)
-	# ego = Vehicle(0, 0, 0)
-	# target velocity
-	# target_vel = 10 # m/s
-	# target course
-	# path
-	# print("Path : {}".format(path))
+	global prev_time
+
 	path_gen = wg.add_more_points2(path2,0.2)
 	path_gen = wg.autoSmooth(path_gen,70)
 	gen_x = []
@@ -347,8 +344,9 @@ def main():
 		gen_x.append(path_gen[i][0])
 		gen_y.append(path_gen[i][1])
 
-	goal = path2[len(path2)-1]
+	# path_gen = path2
 	reach_point = path_gen[len(path_gen)-1]
+
 	# real trajectory
 	traj_ego_x = []
 	traj_ego_y = []
@@ -359,35 +357,29 @@ def main():
 	#               rpm   /s  center angle   deg
 	maxTurnVelDeg = 200 / 60 * pi*4 / 9 *180/pi
 	# for the animation to loop
-	print("index : {}".format(lastFoundIndex))
-	print("distance : {}".format(pt_to_pt_distance([51.3619845725095,-23.235257132970734], [51.793807326459834,-22.333298647689503])))
-	print("distance : {}".format(pt_to_pt_distance([51.3619845725095,-23.235257132970734], goal)))
-	print("step dis : {}".format(linearVel * maxLinVelfeet * dt/1000))
-	# goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
-	# print("goal point : {}	|	index : {}	|	turnVel : {}".format(goalPt,lastFoundIndex,turnVel))
 	if lastFoundIndex <= len(path_gen)-2 :
 		plt.figure(figsize=(12, 8))
-		while pt_to_pt_distance(currentPos, reach_point) >= lookAheadDis:
+		while(pt_to_pt_distance(currentPos, reach_point) >= lookAheadDis):
 	 		# call pure_pursuit_step to get info
 			goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path_gen, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
-			# print("goal point : {}	|	index : {}	|	turnVel : {}".format(goalPt,lastFoundIndex,turnVel))
-			print("index : {}".format(lastFoundIndex))
-			print("current pose : {}	|	goal pose : {}	|	distance : {}".format(currentPos, goalPt, pt_to_pt_distance(currentPos, reach_point)))
+			print("current pose : {}	|	heading : {}".format(currentPos,currentHeading))
 			# model: 200rpm drive with 18" width
 			#               rpm   /s  circ   feet
 			# update x and y, but x and y stays constant here
-			stepDis = linearVel * maxLinVelfeet * dt/1000
+			yaw_err = math.atan2(goalPt[1] - currentPos[0], goalPt[0] - currentPos[0])
+			# stepDis = linearVel * maxLinVelfeet * dt
+			stepDis = linearVel*dt
 			currentPos[0] += stepDis * np.cos(currentHeading*pi/180)
 			currentPos[1] += stepDis * np.sin(currentHeading*pi/180)
-		
+			# yaw_err = math.atan2(goalPt[1] - currentPos[0], goalPt[0] - currentPos[0])
 			# currentHeading += turnVel/10 * maxTurnVelDeg * dt
 			# 360 	=	2*pi
 			# x		=	(x*2*pi)/360
-			currentHeading += turnVel/100 * maxTurnVelDeg * dt/1000
+			currentHeading += turnVel*dt
 			if using_rotation == False :
 				currentHeading = currentHeading%360
 				if currentHeading < 0: currentHeading += 360
-			yaw_err = math.atan2(goalPt[1] - currentPos[0], goalPt[0] - currentPos[0]) - yaw
+			yaw_err = yaw_err*2*pi/360
 			yaw = currentHeading*2*pi/360
 			# store the trajectory
 			traj_ego_x.append(currentPos[0])
@@ -397,11 +389,11 @@ def main():
 			plt.cla()
 			plt.plot(traj_x, traj_y,"-*",color= "black", linewidth=1, label="original course")
 			plt.plot(gen_x, gen_y,"--",color= "grey", linewidth=1, label="generate course")
-			plt.plot(traj_ego_x, traj_ego_y, "-b", linewidth=1, label="trajectory")
+			plt.plot(traj_ego_x, traj_ego_y,"-",color= "blue", linewidth=1, label="trajectory")
 			plt.plot(currentPos[0], currentPos[1],"o" ,color = "red",label="currentPos")
 			plt.plot(goalPt[0], goalPt[1], "og", ms=5, label="target point")
 			# plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw, steer=yaw_err)
-			plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw)
+			plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw, steer=yaw_err)
 			plt.xlabel("x[m]")
 			plt.ylabel("y[m]")
 			plt.axis("equal")
