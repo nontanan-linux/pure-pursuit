@@ -194,6 +194,8 @@ path = [[0.0, 0.0], [0.571194595265405, -0.4277145118491421], [1.141753728014289
 # path1 = [[-4,-2],[-4,2],[4,2],[4,-2],[-4,-2]]
 traj_x = np.arange(0, 100, 5)
 traj_y = [math.sin(x / 10.0) * x / 2.0 for x in traj_x]
+upper_y = [math.sin(x / 10.0) *2* x / 2.0 for x in traj_x]
+lower_y = [math.sin(x / 10.0) * x / 2.0 /2 for x in traj_x]
 path2 = []
 for i in range(0, len(traj_y)):
 	path2.append([traj_x[i],traj_y[i]])
@@ -324,9 +326,9 @@ numOfFrames = 400
 
 ########################################################################################################
 
-# ########################################################################################################
-# ####									Animation function											####
-# ########################################################################################################
+########################################################################################################
+####									Animation function											####
+########################################################################################################
 def main():
 	# define globals
 	global currentPos
@@ -340,11 +342,13 @@ def main():
 	path_gen = wg.autoSmooth(path_gen,70)
 	gen_x = []
 	gen_y = []
+
 	for i in range(0,len(path_gen)):
 		gen_x.append(path_gen[i][0])
 		gen_y.append(path_gen[i][1])
 
 	# path_gen = path2
+
 	reach_point = path_gen[len(path_gen)-1]
 
 	# real trajectory
@@ -392,7 +396,6 @@ def main():
 			plt.plot(traj_ego_x, traj_ego_y,"-",color= "blue", linewidth=1, label="trajectory")
 			plt.plot(currentPos[0], currentPos[1],"o" ,color = "red",label="currentPos")
 			plt.plot(goalPt[0], goalPt[1], "og", ms=5, label="target point")
-			# plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw, steer=yaw_err)
 			plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw, steer=yaw_err)
 			plt.xlabel("x[m]")
 			plt.ylabel("y[m]")
