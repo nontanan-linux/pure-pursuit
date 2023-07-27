@@ -183,8 +183,23 @@ def convert (path, pathName):
 	print('\n')
 	print('length = ',length)
 
-path1 = [[1, 9.5], [3, 11], [6, 9], [9.35, 6.95]]
 
-# path_visualizer (original_path, (figure_size), (figure_x_and_y_limits), length_of_each_line_segment, max_angle_change_between_segments)
-path1 = path_visualizer(path1, (1, 1), (0, 0, 12, 12), 0.5, 20)
-plt.show()
+if __name__ == "__main__":
+	path1 = [[1, 9.5], [3, 11], [6, 9], [9.35, 6.95]]
+	path2 = []
+	traj_x = np.arange(0, 100, 5)
+	traj_y = [math.sin(x / 10.0) * x / 2.0 for x in traj_x]
+	for i in range(0, len(traj_y)):
+		path2.append([traj_x[i],traj_y[i]])
+	# path_visualizer (original_path, (figure_size), (figure_x_and_y_limits), length_of_each_line_segment, max_angle_change_between_segments)
+	# path2 = path_visualizer(path2, (1, 1), (0, 0, 12, 12), 0.5, 40)
+	p = add_more_points2(path2,0.5)
+	p = autoSmooth(p,60)
+	gen_x = []
+	gen_y = []
+	for i in range (0,len(p)):
+		gen_x.append(p[i][0])
+		gen_y.append(p[i][1])
+	plt.plot(traj_x, traj_y,"*",color= "black", linewidth=1, label="original course")
+	plt.plot(gen_x, gen_y,"--",color= "grey", linewidth=1, label="generate course")
+	plt.show()

@@ -12,49 +12,166 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import matplotlib.animation as animation
+import WaypointGenerator as wg
 # from IPython import display
 ########################################################################################################
 
 ########################################################################################################
 ####									Helper function												####
 ########################################################################################################
-# def add_line (path) : 
-# 		for i in range (0,len(path)):
-# 				plt.plot(path[i][0],path[i][1],'.',color='red',markersize=10)
-		
-# 		for i in range(0,len(path)-1):
-# 				plt.plot([path[i][0],path[i+1][0]],[path[i][1],path[i+1][1]],color='b')
-				
-# 				plt.axis('scaled')
-# 				# plt.show()
+# Vehicle parameters (m)
+LENGTH = 4.5 #vehicle lenght
+WIDTH = 2.0 #vehicle width
+BACKTOWHEEL = 1.0 #center back vehicle to back of car
+WHEEL_LEN = 0.3
+WHEEL_WIDTH = 0.2
+TREAD = 0.7
+WB = 2.5
+def plotVehicle(x, y, yaw, steer=0.0, cabcolor="-r", truckcolor="-k"):
+	"""
+	The function is to plot the vehicle
+	it is copied from https://github.com/AtsushiSakai/PythonRobotics/blob/187b6aa35f3cbdeca587c0abdb177adddefc5c2a/PathTracking/model_predictive_speed_and_steer_control/model_predictive_speed_and_steer_control.py#L109
+	"""
+	outline = np.array(
+		[
+			[
+				-BACKTOWHEEL,
+				(LENGTH - BACKTOWHEEL),
+				(LENGTH - BACKTOWHEEL),
+				-BACKTOWHEEL,
+				-BACKTOWHEEL,
+			],
+			[WIDTH / 2, WIDTH / 2, -WIDTH / 2, -WIDTH / 2, WIDTH / 2],
+		]
+	)
 
-# def add_complicated_line (path,lineStyle,lineColor,lineLabel) :
-# 		for i in range (0,len(path)):
-# 				plt.plot(path[i][0],path[i][1],'.',color='red',markersize=10)
-				
-# 		for i in range(0,len(path)-1):
-# 				if(i == 0):
-# 						# plt.plot([path[i][0],path[i+1][0]],[path[i][1],path[i+1][1]],color='b')
-# 						plt.plot([path[i][0],path[i+1][0]],[path[i][1],path[i+1][1]],lineStyle,color=lineColor,label=lineLabel)    
-# 				else:
-# 						plt.plot([path[i][0],path[i+1][0]],[path[i][1],path[i+1][1]],lineStyle,color=lineColor)        
-						
-# 		plt.axis('scaled')
-						
-# def highlight_points (points, pointColor):
-# 		for point in points :
-# 				plt.plot(point[0], point[1], '.', color = pointColor, markersize = 10)
-				
-# def draw_circle (x, y, r, circleColor):
-# 		xs = []
-# 		ys = []
-# 		angles = np.arange(0, 2.2*np.pi, 0.2)        
-		
-# 		for angle in angles :
-# 				xs.append(r*np.cos(angle) + x)
-# 				ys.append(r*np.sin(angle) + y)
-				
-# 		plt.plot(xs, ys, '-', color = circleColor)
+	fr_wheel = np.array(
+		[
+			[WHEEL_LEN, -WHEEL_LEN, -WHEEL_LEN, WHEEL_LEN, WHEEL_LEN],
+			[
+				-WHEEL_WIDTH - TREAD,
+				-WHEEL_WIDTH - TREAD,
+				WHEEL_WIDTH - TREAD,
+				WHEEL_WIDTH - TREAD,
+				-WHEEL_WIDTH - TREAD,
+			],
+		]
+	)
+	# print(outline)
+	# print(fr_wheel)
+
+	rr_wheel = np.copy(fr_wheel)
+	fl_wheel = np.copy(fr_wheel)
+	fl_wheel[1, :] *= -1
+	rl_wheel = np.copy(rr_wheel)
+	rl_wheel[1, :] *= -1
+
+	Rot1 = np.array([[math.cos(yaw), math.sin(yaw)], [-math.sin(yaw), math.cos(yaw)]])
+	Rot2 = np.array([[math.cos(steer), math.sin(steer)], [-math.sin(steer), math.cos(steer)]])
+
+	fr_wheel = (fr_wheel.T.dot(Rot2)).T
+	fl_wheel = (fl_wheel.T.dot(Rot2)).T
+	fr_wheel[0, :] += WB
+	fl_wheel[0, :] += WB
+
+	fr_wheel = (fr_wheel.T.dot(Rot1)).T
+	fl_wheel = (fl_wheel.T.dot(Rot1)).T
+
+	outline = (outline.T.dot(Rot1)).T
+	rr_wheel = (rr_wheel.T.dot(Rot1)).T
+	rl_wheel = (rl_wheel.T.dot(Rot1)).T
+
+	outline[0, :] += x
+	outline[1, :] += y
+	fr_wheel[0, :] += x
+	fr_wheel[1, :] += y
+	rr_wheel[0, :] += x
+	rr_wheel[1, :] += y
+	fl_wheel[0, :] += x
+	fl_wheel[1, :] += y
+	rl_wheel[0, :] += x
+	rl_wheel[1, :] += y
+
+	plt.plot(
+		np.array(outline[0, :]).flatten(),
+		np.array(outline[1, :]).flatten(), 
+		truckcolor
+	)
+	plt.plot(
+		np.array(fr_wheel[0, :]).flatten(),
+		np.array(fr_wheel[1, :]).flatten(),
+		truckcolor,
+	)
+	plt.plot(
+		np.array(rr_wheel[0, :]).flatten(),
+		np.array(rr_wheel[1, :]).flatten(),
+		truckcolor,
+	)
+	plt.plot(
+		np.array(fl_wheel[0, :]).flatten(),
+		np.array(fl_wheel[1, :]).flatten(),
+		truckcolor,
+	)
+	plt.plot(
+		np.array(rl_wheel[0, :]).flatten(),
+		np.array(rl_wheel[1, :]).flatten(),
+		truckcolor,
+	)
+	plt.plot(x, y, "*")
+
+class Vehicle:
+	def __init__(self, x, y, yaw, vel=0):
+		"""
+		Define a vehicle class
+		:param x: float, x position
+		:param y: float, y position
+		:param yaw: float, vehicle heading
+		:param vel: float, velocity
+		"""
+		self.x = x
+		self.y = y
+		self.yaw = yaw
+		self.vel = vel
+
+	def update(self, acc, delta):
+		"""
+		Vehicle motion model, here we are using simple bycicle model
+		:param acc: float, acceleration
+		:param delta: float, heading control
+		"""
+		self.x += self.vel * math.cos(self.yaw) * dt
+		self.y += self.vel * math.sin(self.yaw) * dt
+		self.yaw += self.vel * math.tan(delta) / WB * dt
+		self.vel += acc * dt
+
+class PID:
+	def __init__(self, kp=0.8, ki=0.1, kd=0.001):
+		"""
+		Define a PID controller class
+		:param kp: float, kp coeff
+		:param ki: float, ki coeff
+		:param kd: float, kd coeff
+		:param ki: float, ki coeff
+		"""
+		self.kp = kp
+		self.ki = ki
+		self.kd = kd
+		self.Pterm = 0.0
+		self.Iterm = 0.0
+		self.Dterm = 0.0
+		self.last_error = 0.0
+	def control(self, error):
+		"""
+		PID main function, given an input, this function will output a control unit
+		:param error: float, error term
+		:return: float, output control
+		"""
+		self.Pterm = self.kp * error
+		self.Iterm += self.ki*error * dt
+		self.Dterm += self.kd*error/dt
+		self.last_error = error
+		output = self.Pterm + self.ki * self.Iterm
+		return output
 
 def pt_to_pt_distance (pt1,pt2):
 	distance = np.sqrt((pt2[0] - pt1[0])**2 + (pt2[1] - pt1[1])**2)
@@ -185,12 +302,16 @@ def pure_pursuit_step (path, currentPos, currentHeading, lookAheadDis, LFindex) 
 # -------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # THIS IS DIFFERENT THAN BEFORE! initialize variables here
 # you can also change the Kp constant which is located at line 113
+# for the sake of my sanity
+pi = np.pi
 currentPos = [0, 0]
 currentHeading = 330
+yaw = currentHeading*2*pi/360
 lastFoundIndex = 0
-lookAheadDis = 4
+lookAheadDis = 5
 linearVel = 2
 dt = 50
+
 
 # set this to true if you use rotations
 using_rotation = False
@@ -198,81 +319,18 @@ using_rotation = False
 # this determines how long (how many frames) the animation will run. 400 frames takes around 30 seconds.
 numOfFrames = 400
 
-# for the sake of my sanity
-pi = np.pi
-# # animation
-# fig = plt.figure()
-# trajectory_lines = plt.plot([], '-', color='orange', linewidth = 4)
-# trajectory_line = trajectory_lines[0]
-# heading_lines = plt.plot([], '-', color='red')
-# heading_line = heading_lines[0]
-# connection_lines = plt.plot([], '-', color='green')
-# connection_line = connection_lines[0]
-# poses = plt.plot([], 'o', color='black', markersize=10)
-# pose = poses[0]
-# lookAhead_point = plt.plot([], '*', color='blue', markersize=10)
-# lookAhead = lookAhead_point[0]
-
-# # other setup, stationary stuff for example
-# pathForGraph = np.array(path)
-# plt.plot(pathForGraph[:, 0], pathForGraph[:, 1], '--', color='grey')
-# plt.axis("scaled")
-# # plt.xlim (-6, 6)
-# # plt.ylim (-4, 4)
-
 ########################################################################################################
 
 # ########################################################################################################
 # ####									Animation function											####
 # ########################################################################################################
-# def pure_pursuit_animation (frame) :
-# 	# define globals
-# 	global currentPos
-# 	global currentHeading
-# 	global lastFoundIndex
-# 	global linearVel
-
-# 	# for the animation to loop
-# 	if lastFoundIndex >= len(path)-2 : lastFoundIndex = 0
-
-# 	# call pure_pursuit_step to get info
-# 	goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
-
-# 	# model: 200rpm drive with 18" width
-# 	#               rpm   /s  circ   feet
-# 	maxLinVelfeet = 200 / 60 * pi*4 / 12
-# 	#               rpm   /s  center angle   deg
-# 	maxTurnVelDeg = 200 / 60 * pi*4 / 9 *180/pi
-
-# 	# update x and y, but x and y stays constant here
-# 	stepDis = linearVel/100 * maxLinVelfeet * dt/1000
-# 	currentPos[0] += stepDis * np.cos(currentHeading*pi/180)
-# 	currentPos[1] += stepDis * np.sin(currentHeading*pi/180)
-
-# 	heading_line.set_data ([currentPos[0], currentPos[0] + 0.5*np.cos(currentHeading/180*pi)], [currentPos[1], currentPos[1] + 0.5*np.sin(currentHeading/180*pi)])
-# 	connection_line.set_data ([currentPos[0], goalPt[0]], [currentPos[1], goalPt[1]])
-
-# 	currentHeading += turnVel/100 * maxTurnVelDeg * dt/1000
-# 	if using_rotation == False :
-# 		currentHeading = currentHeading%360
-# 		if currentHeading < 0: currentHeading += 360
-
-# 	# rest of the animation code
-# 	xs.append(currentPos[0])
-# 	ys.append(currentPos[1])
-# 	# plt.cla()
-# 	plt.axis("equal")
-# 	pose.set_data ((currentPos[0], currentPos[1]))
-# 	lookAhead.set_data((goalPt[0],goalPt[1]))
-# 	# plotVehicle(currentPos[0], currentPos[1], currentHeading)
-# 	trajectory_line.set_data (xs, ys)
-
 def main():
 	# define globals
 	global currentPos
 	global currentHeading
 	global lastFoundIndex
 	global linearVel
+	global yaw
 	# create vehicle
 	# plotVehicle(ego.x, ego.y, ego.yaw)
 	# ego = Vehicle(0, 0, 0)
@@ -281,17 +339,19 @@ def main():
 	# target course
 	# path
 	# print("Path : {}".format(path))
-	print(len(path2))
-	print(path2)
-	goal = path2[len(path2)-1]
-	print(goal)
+	path_gen = wg.add_more_points2(path2,0.2)
+	path_gen = wg.autoSmooth(path_gen,70)
+	gen_x = []
+	gen_y = []
+	for i in range(0,len(path_gen)):
+		gen_x.append(path_gen[i][0])
+		gen_y.append(path_gen[i][1])
 
+	goal = path2[len(path2)-1]
+	reach_point = path_gen[len(path_gen)-1]
 	# real trajectory
 	traj_ego_x = []
 	traj_ego_y = []
-
-	curr_x = []
-	curr_y = []
 
 	# model: 200rpm drive with 18" width
 	#               rpm   /s  circ   feet
@@ -299,21 +359,20 @@ def main():
 	#               rpm   /s  center angle   deg
 	maxTurnVelDeg = 200 / 60 * pi*4 / 9 *180/pi
 	# for the animation to loop
-	# if lastFoundIndex >= len(path)-2 : lastFoundIndex = 0
 	print("index : {}".format(lastFoundIndex))
 	print("distance : {}".format(pt_to_pt_distance([51.3619845725095,-23.235257132970734], [51.793807326459834,-22.333298647689503])))
 	print("distance : {}".format(pt_to_pt_distance([51.3619845725095,-23.235257132970734], goal)))
 	print("step dis : {}".format(linearVel * maxLinVelfeet * dt/1000))
 	# goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
 	# print("goal point : {}	|	index : {}	|	turnVel : {}".format(goalPt,lastFoundIndex,turnVel))
-	if lastFoundIndex <= len(path2)-2 :
+	if lastFoundIndex <= len(path_gen)-2 :
 		plt.figure(figsize=(12, 8))
-		while pt_to_pt_distance(currentPos, goal) >= 1:
+		while pt_to_pt_distance(currentPos, reach_point) >= lookAheadDis:
 	 		# call pure_pursuit_step to get info
-			goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path2, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
+			goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path_gen, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
 			# print("goal point : {}	|	index : {}	|	turnVel : {}".format(goalPt,lastFoundIndex,turnVel))
 			print("index : {}".format(lastFoundIndex))
-			print("current pose : {}	|	goal pose : {}	|	distance : {}".format(currentPos, goalPt, pt_to_pt_distance(currentPos, goal)))
+			print("current pose : {}	|	goal pose : {}	|	distance : {}".format(currentPos, goalPt, pt_to_pt_distance(currentPos, reach_point)))
 			# model: 200rpm drive with 18" width
 			#               rpm   /s  circ   feet
 			# update x and y, but x and y stays constant here
@@ -321,26 +380,28 @@ def main():
 			currentPos[0] += stepDis * np.cos(currentHeading*pi/180)
 			currentPos[1] += stepDis * np.sin(currentHeading*pi/180)
 		
-			currentHeading += turnVel/10 * maxTurnVelDeg * dt/1000
-			# currentHeading += turnVel/100 * maxTurnVelDeg * dt/1000
-			# if using_rotation == False :
-			# 	currentHeading = currentHeading%360
-			# 	if currentHeading < 0: currentHeading += 360
-		
+			# currentHeading += turnVel/10 * maxTurnVelDeg * dt
+			# 360 	=	2*pi
+			# x		=	(x*2*pi)/360
+			currentHeading += turnVel/100 * maxTurnVelDeg * dt/1000
+			if using_rotation == False :
+				currentHeading = currentHeading%360
+				if currentHeading < 0: currentHeading += 360
+			yaw_err = math.atan2(goalPt[1] - currentPos[0], goalPt[0] - currentPos[0]) - yaw
+			yaw = currentHeading*2*pi/360
 			# store the trajectory
 			traj_ego_x.append(currentPos[0])
 			traj_ego_y.append(currentPos[1])
-			curr_x = currentPos[0]
-			curr_y = currentPos[1]
 
 			# plots
 			plt.cla()
-			plt.plot(traj_x, traj_y,"*",color= "black", linewidth=1, label="course")
+			plt.plot(traj_x, traj_y,"-*",color= "black", linewidth=1, label="original course")
+			plt.plot(gen_x, gen_y,"--",color= "grey", linewidth=1, label="generate course")
 			plt.plot(traj_ego_x, traj_ego_y, "-b", linewidth=1, label="trajectory")
-			plt.plot(curr_x, curr_y,"o" ,color = "red",label="currentPos")
+			plt.plot(currentPos[0], currentPos[1],"o" ,color = "red",label="currentPos")
 			plt.plot(goalPt[0], goalPt[1], "og", ms=5, label="target point")
-			# plotVehicle(ego.x, ego.y, ego.yaw, delta)
-			# plotVehicle(ego.x, ego.y, ego.yaw)
+			# plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw, steer=yaw_err)
+			plotVehicle(x=currentPos[0], y=currentPos[1], yaw=yaw)
 			plt.xlabel("x[m]")
 			plt.ylabel("y[m]")
 			plt.axis("equal")
