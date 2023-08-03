@@ -297,6 +297,100 @@ def pure_pursuit_step (path, currentPos, currentHeading, lookAheadDis, LFindex) 
 	turnVel = Kp*turnError
   
 	return goalPt, lastFoundIndex, turnVel
+
+def pure_pursuit_step2 (path, currentPos, currentHeading, lookAheadDis, LFindex) :
+	# extract currentX and currentY
+	currentX = currentPos[0]
+	currentY = currentPos[1]
+
+	# use for loop to search intersections
+	lastFoundIndex = LFindex
+	intersectFound = False
+	startingIndex = lastFoundIndex
+
+	for i in range (startingIndex, len(path)-1):
+		# beginning of line-circle intersection code
+		j = 1
+		x1 = path[i][0] - currentX
+		y1 = path[i][1] - currentY
+		x2 = path[i+j][0] - currentX
+		y2 = path[i+j][1] - currentY
+		line_slope = (y2-y1)/(x2-x1)
+		line_intercept = y1 - line_slope*x1
+		A = 1 + line_slope**2
+		B = 2*line_slope*line_intercept - 2*line_slope*currentY -2*currentX
+		C = currentX**2 + currentY**2 + line_intercept**2 -2*line_intercept*currentY - lookAheadDis**2
+		discriminant = B**2 - 4 * A * C
+
+		if discriminant >= 0:
+			sol_x1 = (-B + math.sqrt(discriminant)) / (2 * A)
+			sol_x2 = (-B - math.sqrt(discriminant)) / (2 * A)
+			sol_y1 = line_slope * x1 + line_intercept
+			sol_y2 = line_slope * x2 + line_intercept
+
+			sol_pt1 = [sol_x1, sol_y1 + currentY]
+			sol_pt2 = [sol_x2, sol_y2 + currentY]
+	  		# end of line-circle intersection code
+
+			# minX = min(x1,x2)
+			# minY = min(y1,y2)
+			# maxX = max(x1,x2)
+			# maxY = max(y1,y2)
+			minX = min(path[i][0], path[i+1][0])
+			minY = min(path[i][1], path[i+1][1])
+			maxX = max(path[i][0], path[i+1][0])
+			maxY = max(path[i][1], path[i+1][1])
+
+			# if one or both of the solutions are in range
+			if ((minX <= sol_pt1[0] <= maxX) and (minY <= sol_pt1[1] <= maxY)) or ((minX <= sol_pt2[0] <= maxX) and (minY <= sol_pt2[1] <= maxY)):
+				foundIntersection = True
+			
+				# if both solutions are in range, check which one is better
+				if ((minX <= sol_pt1[0] <= maxX) and (minY <= sol_pt1[1] <= maxY)) and ((minX <= sol_pt2[0] <= maxX) and (minY <= sol_pt2[1] <= maxY)):
+					# make the decision by compare the distance between the intersections and the next point in path
+					if pt_to_pt_distance(sol_pt1, path[i+1]) < pt_to_pt_distance(sol_pt2, path[i+1]):
+						goalPt = sol_pt1
+					else:
+						goalPt = sol_pt2
+				# if not both solutions are in range, take the one that's in range
+				else:
+					# if solution pt1 is in range, set that as goal point
+					if (minX <= sol_pt1[0] <= maxX) and (minY <= sol_pt1[1] <= maxY):
+						goalPt = sol_pt1
+					else:
+						goalPt = sol_pt2
+  
+				# only exit loop if the solution pt found is closer to the next pt in path than the current pos
+				if pt_to_pt_distance (goalPt, path[i+1]) < pt_to_pt_distance ([currentX, currentY], path[i+1]):
+		  			# update lastFoundIndex and exit
+					lastFoundIndex = i
+					break
+				else:
+					# in case for some reason the robot cannot find intersection in the next path segment, but we also don't want it to go backward
+					lastFoundIndex = i+1
+		# if no solutions are in range
+		else:
+			foundIntersection = False
+			# no new intersection found, potentially deviated from the path
+			# follow path[lastFoundIndex]
+			goalPt = [path[lastFoundIndex][0], path[lastFoundIndex][1]]
+
+	# obtained goal point, now compute turn vel
+	# initialize proportional controller constant
+	Kp = 3
+
+	# calculate absTargetAngle with the atan2 function
+	absTargetAngle = math.atan2 (goalPt[1]-currentPos[1], goalPt[0]-currentPos[0]) *180/pi
+	if absTargetAngle < 0: absTargetAngle += 360
+
+	# compute turn error by finding the minimum angle
+	turnError = absTargetAngle - currentHeading
+	if turnError > 180 or turnError < -180 :
+		turnError = -1 * sgn(turnError) * (360 - abs(turnError))
+
+	# apply proportional controller
+	turnVel = Kp*turnError
+	return goalPt, lastFoundIndex, turnVel
 ########################################################################################################
 
 ########################################################################################################
@@ -312,7 +406,7 @@ currentPos = [0, 0]
 currentHeading = 330
 yaw = currentHeading*2*pi/360
 lastFoundIndex = 0
-lookAheadDis = 5
+lookAheadDis = 4
 linearVel = 2
 dt = 0.5
 prev_time = 0
@@ -366,7 +460,9 @@ def main():
 		while(pt_to_pt_distance(currentPos, reach_point) >= lookAheadDis):
 	 		# call pure_pursuit_step to get info
 			goalPt, lastFoundIndex, turnVel = pure_pursuit_step (path_gen, currentPos, currentHeading, lookAheadDis, lastFoundIndex)
-			print("current pose : {}	|	heading : {}".format(currentPos,currentHeading))
+			print("index : {}	|	current pose : {}	|	heading : {}".format(lastFoundIndex,currentPos,currentHeading))
+			print("goal point : {}".format(goalPt))
+			# print("Reach : {}".format(pt_to_pt_distance(currentPos, reach_point) >= lookAheadDis))
 			# model: 200rpm drive with 18" width
 			#               rpm   /s  circ   feet
 			# update x and y, but x and y stays constant here
